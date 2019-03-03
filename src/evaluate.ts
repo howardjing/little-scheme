@@ -99,9 +99,9 @@ const value = (expression: Expression) => {
 }
 
 const meaning = (expression: Expression, context: Table) => {
-  console.log("finding meaning of", expression, 'context', context)
+  console.log("finding meaning of", JSON.stringify(expression), 'context', JSON.stringify(context))
   const val = handleAction(expressionToAction(expression))(expression, context);
-  console.log("meaning was", val);
+  console.log("meaning was", JSON.stringify(val));
   return val;
 }
 
@@ -156,7 +156,7 @@ function handleConst(expression: Expression): Expression {
  * This is used when applying lambda functions.
  */
 function handleIdentifier(expression: Expression, context: Table): Expression {
-  console.log("handleIdentifier", expression, 'context', context);
+  console.log("handleIdentifier", JSON.stringify(expression), 'context', JSON.stringify(context));
   return lookup(expression as string, context);
 }
 
@@ -166,7 +166,7 @@ function handleIdentifier(expression: Expression, context: Table): Expression {
  */
 function handleQuote(expression: Expression): Expression {
   if (isAtom(expression)) { throw new Error(`handleQuote cannot evaluate ${JSON.stringify(expression)}`)}
-  console.log('handleQuote', expression);
+  console.log('handleQuote', JSON.stringify(expression));
   const [_, quoted] = expression;
   return quoted;
 }
@@ -177,7 +177,7 @@ function handleQuote(expression: Expression): Expression {
  */
 function handleLambda(expression: Expression, context: Table): Expression {
   if (isAtom(expression)) { throw new Error(`handleQuote cannot evaluate ${JSON.stringify(expression)}`)}
-  console.log('handleLambda', expression, 'context', context);
+  console.log('handleLambda', JSON.stringify(expression), 'context', JSON.stringify(context));
   const formals = expression[1] as string[];
   const body = expression[2];
   const lambda: NonPrimitiveFun = ['nonPrimitive', [context, formals, body]];
@@ -197,7 +197,7 @@ function handleLambda(expression: Expression, context: Table): Expression {
  */
 function handleCond(expression: Expression, context: Table): Expression {
   if (isAtom(expression)) { throw new Error(`handleCond cannot evaluate ${JSON.stringify(expression)}`)}
-  console.log('handleQuote', expression, 'context', context);
+  console.log('handleQuote', JSON.stringify(expression), 'context', JSON.stringify(context));
 
   // ignore the first element in expression -- the first element is 'cond'
   const truthfulExp: ExpressionArray | undefined = expression.slice(1)
@@ -249,13 +249,13 @@ function handleCond(expression: Expression, context: Table): Expression {
  * The rest of the elements in the list are the arguments assigned to the lambda function.
  */
 function handleApplication(expression: Expression, context: Table): Expression {
-  console.log('handleApplication', expression, 'context', context);
+  console.log('handleApplication', JSON.stringify(expression), 'context', JSON.stringify(context));
 
   /**
    * helper method that distinguishes between primitive and non primitive functions
    */
   const apply = (fun: Fun, args: ExpressionArray) => {
-    console.log("apply", fun, 'with args', args)
+    console.log("apply", JSON.stringify(fun), 'with args', JSON.stringify(args))
     if (isPrimitiveFun(fun)) {
       const [_, primitive] = fun;
       return applyPrimitive(primitive, args);
@@ -273,7 +273,7 @@ function handleApplication(expression: Expression, context: Table): Expression {
    * handle our base default functions
    */
   const applyPrimitive = (name: Primitive, args: ExpressionArray): Expression => {
-    console.log("applyPrimitive", name, 'with args', args)
+    console.log("applyPrimitive", name, 'with args', JSON.stringify(args))
     if (name === 'cons') {
       const [head, tail] = args;
       return [head].concat(tail);
@@ -332,6 +332,7 @@ function handleApplication(expression: Expression, context: Table): Expression {
    * arguments passed in to the lambda function
    */
   const applyClosure = (fun: [Table, string[], Expression], args: ExpressionArray): Expression => {
+    console.log("applyClosure", JSON.stringify(fun), 'with args', JSON.stringify(args))
     const [table, formals, body] = fun;
     return meaning(body, extendTable(buildEntry(formals, args), table))
   }
@@ -378,7 +379,7 @@ function handleApplication(expression: Expression, context: Table): Expression {
 
 const expressionToAction = (expression: Expression): Action => {
   const action = isAtom(expression) ? atomToAction(expression) : listToAction(expression);
-  console.log(action,  expression);
+  console.log(action,  JSON.stringify(expression));
   return action;
 }
 
