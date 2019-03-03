@@ -112,9 +112,6 @@ function handleConst(expression: Expression): Expression {
     return expression;
   }
 
-  // // NOTE: this differs from book, [] is not considered valid
-  // if (isEmpty(expression)) { return expression; }
-
   // we assume expression is one of the primitive functions as defined in atomToAction
   const fun: Fun = ['primitive', expression as Primitive];
   return fun;
@@ -236,16 +233,21 @@ function handleApplication(expression: Expression, context: Table): Expression {
 
     throw new Error(`applyPrimitive cannot handle: ${name}`)
   }
-
+  // here fn is either a lambda, or a primitive function name
   const [fn, ...args] = expression as ExpressionArray;
+  console.log("YO", expression, "SPLIT INTO", fn, "AND", args)
 
   const evalList = (e: ExpressionArray, c: Table): ExpressionArray => {
-    if (isEmpty(e)) { return [] }
+    console.log('evalList', e, isEmpty(e))
+    if (isEmpty(e)) { return ['quote', []] }
     const [head, ...tail] = e;
-    return [value(head, c)].concat(evalList(tail, c))
+    // NOTE: this differs from the book -- if our head is the empty list,
+    // we must quote it (since the empty list is not a valid s expression).
+    return [isEmpty(head) ? value(['quote', []]) : value(head, c)].concat(evalList(tail, c))
   }
 
-  return apply(value(fn, context) as Fun, args);
+  // here we convert the function into a Fun, and deal with args
+  return apply(value(fn, context) as Fun, evalList(args, context));
 }
 
 const dummy = () => 'dummy';
@@ -267,9 +269,6 @@ const atomToAction = (atom: Atom): Action => {
 }
 
 const listToAction = (list: ExpressionArray): Action => {
-  // // NOTE: this differs from book -- [] is considered invalid
-  // if (isEmpty(list)) { return '*const' }
-
   const [head] = list;
   if (isAtom(head)) {
     if (head === 'quote') {
