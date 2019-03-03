@@ -28,10 +28,10 @@ type PrimitiveFun = ['primitive', Primitive];
 /**
  * This represents a lambda function
  *   - Table represents the current context
- *   - ExpressionArray is the list of arguments
+ *   - string[] is the list of arguments
  *   - Expression is the lambda body
  */
-type NonPrimitiveFun = ['nonPrimitive', [Table, ExpressionArray, Expression]];
+type NonPrimitiveFun = ['nonPrimitive', [Table, string[], Expression]];
 type Fun = PrimitiveFun | NonPrimitiveFun;
 
 const isPrimitiveFun = (fun: Fun): fun is PrimitiveFun => fun[0] === 'primitive';
@@ -65,6 +65,19 @@ const lookup = (name: string, table: Table): Expression => {
 
   throw new Error(`Could not find key ${name}`)
 }
+
+const buildEntry = (formals: string[], values: ExpressionArray) => {
+  if (formals.length !== values.length) {
+    throw new Error(`Mismatched length between formals and values: ${JSON.stringify(formals)}, ${JSON.stringify(values)}`)
+  }
+  const entry: { [name: string]: Expression } = {};
+  formals.forEach((formal, i) => {
+    entry[formal] = values[i];
+  });
+  return entry;
+}
+
+const extendTable = (entry: Entry, table: Table): Table => [entry, ...table];
 
 /**
  * atomToAction
@@ -160,7 +173,7 @@ function handleQuote(expression: Expression): Expression {
 function handleLambda(expression: Expression, context: Table): Expression {
   if (isAtom(expression)) { throw new Error(`handleQuote cannot evaluate ${JSON.stringify(expression)}`)}
   console.log('handleLambda', expression, 'context', context);
-  const formals = expression[1] as ExpressionArray;
+  const formals = expression[1] as string[];
   const body = expression[2];
   const lambda: NonPrimitiveFun = ['nonPrimitive', [context, formals, body]];
   return lambda as Expression;
@@ -225,7 +238,12 @@ function handleApplication(expression: Expression, context: Table): Expression {
       return applyPrimitive(primitive, args);
     }
 
-    throw new Error("Can't handle non primitive functions yet");
+    if (isNonPrimitiveFun(fun)) {
+      const [_, lambda] = fun;
+      return applyClosure(lambda, args);
+    }
+
+    throw new Error(`Can't handle function ${JSON.stringify(fun)}`);
   }
 
   /**
@@ -284,6 +302,11 @@ function handleApplication(expression: Expression, context: Table): Expression {
     }
 
     throw new Error(`applyPrimitive cannot handle: ${name}`)
+  }
+
+  const applyClosure = (fun: [Table, string[], Expression], args: ExpressionArray): Expression => {
+    const [table, formals, body] = fun;
+    return meaning(body, extendTable(buildEntry(formals, args), table))
   }
   // here fn is either a lambda, or a primitive function name
   const [fn, ...args] = expression as ExpressionArray;
