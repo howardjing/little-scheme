@@ -1,30 +1,34 @@
+import { evaluate } from './evaluate';
 
-type Atom = number | string;
-
-type Expression = Atom | ExpressionArray;
-// https://github.com/Microsoft/TypeScript/issues/3988 -- workaround for type Expression = Atom | Expression[]
-interface ExpressionArray extends Array<Expression> {}
-
-
-const apply = (expression: Expression) => {
-  if (isAtom(expression)) { return expression }
-
-  throw new Error(`Unsupported expression ${JSON.stringify(expression)}`)
-}
-
-const isAtom = (expression: Expression) => !Array.isArray(expression);
-
-const expressions: Expression[] = [
+const expressions = [
   1,
   ["quote", 1],
   ["quote", [1,2]],
-  ['+', 1, 2],
+  ['addOne', 10],
+  ['cons', 1, [2, 3]],
+  ['head', ['a', 'b', 'c']],
+  ['tail', ['a', 'b', 'c']],
+  ['isEmpty', []],
+  ['isEmpty', [1,2]],
+  ['isEqual', 1, 2],
+  ['isEqual', 2, 2],
+  ['isAtom', 1],
+  ['isAtom', 2],
+  ['isAtom', ['primitive']],
+  ['isAtom', [['primitive']]],
+  ['isZero', 0],
+  ['isZero', [0]],
+  ['addOne', 10],
+  ['subOne', 10],
+  ['isNumber', 123],
+  ['isNumber', '12'],
+  ['cons', 1, ['cons', 2, ['cons', 3, []]]]
 ]
 
 expressions.forEach(expression => {
   try {
     console.log("EVALUATING", expression);
-    console.log(apply(expression))
+    console.log(evaluate(expression))
   } catch (e) {
     console.error(e)
   }
