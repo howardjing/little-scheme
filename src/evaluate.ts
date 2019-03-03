@@ -152,7 +152,8 @@ function handleConst(expression: Expression): Expression {
 }
 
 /**
- * TODO: figure out what's going on here
+ * We're given a variable name to identify. Return the variable value based on our current context.
+ * This is used when applying lambda functions.
  */
 function handleIdentifier(expression: Expression, context: Table): Expression {
   console.log("handleIdentifier", expression, 'context', context);
@@ -170,6 +171,10 @@ function handleQuote(expression: Expression): Expression {
   return quoted;
 }
 
+/**
+ * Let the interpreter know that we're dealing with a non primitive (i.e. lambda) function. When it comes
+ * time for somebody to apply the function, give them our current context, formals, and body.
+ */
 function handleLambda(expression: Expression, context: Table): Expression {
   if (isAtom(expression)) { throw new Error(`handleQuote cannot evaluate ${JSON.stringify(expression)}`)}
   console.log('handleLambda', expression, 'context', context);
@@ -220,10 +225,28 @@ function handleCond(expression: Expression, context: Table): Expression {
  *
  * If a function application is non primitive, we assume it looks like this:
  *
- * [['lambda', [a, b], ['cons', a, b]], 1, []]
+ * [
+ *   // first element - lambda
+ *   [
+ *     // context
+ *     [{ 'x': [1, 2]}],
+ *     // formals
+ *     ['a', 'b'],
+ *     // body
+ *     ['cons', 'a', ['cons', b', 'x']],
+ *   ],
  *
- * The first element in the list is the lambda function, and the rest of the list
- * are the function's arguments
+ *   // rest of the elements - lambda arguments
+ *   3, 4,
+ * ]
+ *
+ * The first element in the list is a list that represents the lambda function:
+ *
+ *   The first element in the lambda function is the context of the lambda function.
+ *   The second element in the lambda function are the argument names of the lambda function.
+ *   The third element in the lambda functionof the list is the lambda body
+ *
+ * The rest of the elements in the list are the arguments assigned to the lambda function.
  */
 function handleApplication(expression: Expression, context: Table): Expression {
   console.log('handleApplication', expression, 'context', context);
@@ -304,10 +327,15 @@ function handleApplication(expression: Expression, context: Table): Expression {
     throw new Error(`applyPrimitive cannot handle: ${name}`)
   }
 
+  /**
+   * Evaluate the lambda body, taking care to extend the current context with
+   * arguments passed in to the lambda function
+   */
   const applyClosure = (fun: [Table, string[], Expression], args: ExpressionArray): Expression => {
     const [table, formals, body] = fun;
     return meaning(body, extendTable(buildEntry(formals, args), table))
   }
+
   // here fn is either a lambda, or a primitive function name
   const [fn, ...args] = expression as ExpressionArray;
 

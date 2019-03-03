@@ -35,6 +35,7 @@ const expressions = [
   [[['lambda', ['x'],
       ['lambda', ['y'],
         ['cons', 'x', ['cons', 'y', []]]]], 2], 1],
+  [['lambda', ['a', 'b'], ['cons', 'a', ['cons', 'b', []]]], 5, 6]
 ]
 
 expressions.forEach(expression => {
