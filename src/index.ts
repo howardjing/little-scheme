@@ -47,3 +47,20 @@ expressions.forEach(expression => {
     console.error(e)
   }
 })
+
+/**
+ * find the length of a list
+ */
+// (((lambda (f) (f f))
+//   (lambda (f)
+//     (lambda (xs)
+//       (cond ((isEmpty xs) 0)
+//         (else (addOne ((f f) (tail xs)))))))) (quote (1 2 3)))
+
+const countElements =
+  [[['lambda', ['f'], ['f', 'f']],
+    ['lambda', ['f'],
+      ['lambda', ['xs'],
+        ['cond', [['isEmpty', 'xs'], 0],
+          ['else', ['addOne', [['f', 'f'], ['tail', 'xs']]]]]]]], ['quote', [1, 2, 3, 4, 5]]];
+console.log(evaluate(countElements))
