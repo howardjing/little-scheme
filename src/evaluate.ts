@@ -5,8 +5,6 @@ type Expression = Atom | ExpressionArray;
 // https://github.com/Microsoft/TypeScript/issues/3988 -- workaround for type Expression = Atom | Expression[]
 interface ExpressionArray extends Array<Expression> {}
 
-const _head = <T>(xs: T[]): T => xs[0];
-const _tail = <T>(xs: T[]): T[] => xs.slice(1);
 const isEmpty = (expression: Expression) => !isAtom(expression) && expression.length === 0;
 
 /**
@@ -27,11 +25,17 @@ type Entry = { [name: string]: Expression }
 type Table = Entry[];
 
 type PrimitiveFun = ['primitive', Primitive];
-type NonPrimitiveFun = ['nonPrimitive', Expression];
+/**
+ * This represents a lambda function
+ *   - Table represents the current context
+ *   - ExpressionArray is the list of arguments
+ *   - Expression is the lambda body
+ */
+type NonPrimitiveFun = ['nonPrimitive', [Table, ExpressionArray, Expression]];
 type Fun = PrimitiveFun | NonPrimitiveFun;
 
-const isPrimitiveFun = (fun: Fun): fun is PrimitiveFun => _head(fun) === 'primitive';
-const isNonPrimitiveFun = (fun: Fun): fun is NonPrimitiveFun => _head(fun) === 'nonPrimitive';
+const isPrimitiveFun = (fun: Fun): fun is PrimitiveFun => fun[0] === 'primitive';
+const isNonPrimitiveFun = (fun: Fun): fun is NonPrimitiveFun => fun[0] === 'nonPrimitive';
 
 
 /**
@@ -82,7 +86,7 @@ const value = (expression: Expression) => {
 }
 
 const meaning = (expression: Expression, context: Table) => {
-  console.log("finding meaning of", expression, context)
+  console.log("finding meaning of", expression, 'context', context)
   const val = handleAction(expressionToAction(expression))(expression, context);
   console.log("meaning was", val);
   return val;
@@ -93,7 +97,7 @@ const handleAction = (action: Action): (expression: Expression, context: Table) 
     case '*const': return handleConst;
     case '*identifier': return handleIdentifier;
     case '*quote': return handleQuote;
-    case '*lambda': return dummy;
+    case '*lambda': return handleLambda;
     case '*cond': return handleCond;
     case '*application': return handleApplication;
     default: throw new Error(`Invalid action: ${action}`)
@@ -138,7 +142,7 @@ function handleConst(expression: Expression): Expression {
  * TODO: figure out what's going on here
  */
 function handleIdentifier(expression: Expression, context: Table): Expression {
-  console.log("handleIdentifier", expression);
+  console.log("handleIdentifier", expression, 'context', context);
   return lookup(expression as string, context);
 }
 
@@ -151,6 +155,15 @@ function handleQuote(expression: Expression): Expression {
   console.log('handleQuote', expression);
   const [_, quoted] = expression;
   return quoted;
+}
+
+function handleLambda(expression: Expression, context: Table): Expression {
+  if (isAtom(expression)) { throw new Error(`handleQuote cannot evaluate ${JSON.stringify(expression)}`)}
+  console.log('handleLambda', expression, 'context', context);
+  const formals = expression[1] as ExpressionArray;
+  const body = expression[2];
+  const lambda: NonPrimitiveFun = ['nonPrimitive', [context, formals, body]];
+  return lambda as Expression;
 }
 
 /**
@@ -166,7 +179,7 @@ function handleQuote(expression: Expression): Expression {
  */
 function handleCond(expression: Expression, context: Table): Expression {
   if (isAtom(expression)) { throw new Error(`handleCond cannot evaluate ${JSON.stringify(expression)}`)}
-  console.log('handleQuote', expression, context);
+  console.log('handleQuote', expression, 'context', context);
 
   // ignore the first element in expression -- the first element is 'cond'
   const truthfulExp: ExpressionArray | undefined = expression.slice(1)
@@ -200,13 +213,13 @@ function handleCond(expression: Expression, context: Table): Expression {
  * are the function's arguments
  */
 function handleApplication(expression: Expression, context: Table): Expression {
-  console.log('handleApplication', expression, context);
+  console.log('handleApplication', expression, 'context', context);
 
   /**
    * helper method that distinguishes between primitive and non primitive functions
    */
   const apply = (fun: Fun, args: ExpressionArray) => {
-    console.log("apply", fun, args)
+    console.log("apply", fun, 'with args', args)
     if (isPrimitiveFun(fun)) {
       const [_, primitive] = fun;
       return applyPrimitive(primitive, args);
@@ -219,7 +232,7 @@ function handleApplication(expression: Expression, context: Table): Expression {
    * handle our base default functions
    */
   const applyPrimitive = (name: Primitive, args: ExpressionArray): Expression => {
-    console.log("applyPrimitive", name, args)
+    console.log("applyPrimitive", name, 'with args', args)
     if (name === 'cons') {
       const [head, tail] = args;
       return [head].concat(tail);
@@ -247,21 +260,6 @@ function handleApplication(expression: Expression, context: Table): Expression {
 
     if (name === 'isAtom') {
       const expression = args[0];
-
-      // TODO: not sure why this is necessary -- why not just call isAtom?
-      // i also don't think this method is defined correctly
-      // const isAppliedExpressionAtom = (expression: Expression) => {
-      //   if (isAtom(expression)) { return true; }
-      //   if (expression.length === 0) { return false; }
-      //   const [head] = expression;
-      //   if (head === 'primitive' || head === 'nonPrimitive') {
-      //     return true;
-      //   }
-
-      //   return false;
-      // }
-
-      // return isAppliedExpressionAtom(expression);
       return isAtom(expression);
     }
 
@@ -327,11 +325,6 @@ function handleApplication(expression: Expression, context: Table): Expression {
   )
 }
 
-/**
- * placeholder action handler
- */
-const dummy = () => 'dummy';
-
 const expressionToAction = (expression: Expression): Action => {
   const action = isAtom(expression) ? atomToAction(expression) : listToAction(expression);
   console.log(action,  expression);
@@ -344,6 +337,15 @@ const atomToAction = (atom: Atom): Action => {
 
   if (PRIMITIVE_FUNCTIONS.has(atom)) { return '*const' }
 
+  /**
+   * Assume this atom is a variable name referenced in a lambda function. For example,
+   * in the following lambda expression,
+   *
+   * (lambda (a b) (cons a (cons b ())))
+   *
+   * within the lambda body, `a` and `b` will be treated as identifiers. We will need look at the
+   * context to figure out what `a` and `b` should evaluate to.
+   */
   return '*identifier';
 }
 
