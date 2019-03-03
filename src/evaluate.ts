@@ -72,10 +72,14 @@ const isAtom = (expression: Expression): expression is Atom => !Array.isArray(ex
 const isNumber = (expression: Expression): expression is number => typeof expression === 'number';
 const isBoolean = (expression: Expression): expression is boolean => expression === true || expression === false;
 
-const value = (expression: Expression, context: Table = []) => {
-  console.log("finding value of", expression, context)
+const value = (expression: Expression) => {
+  return meaning(expression, []);
+}
+
+const meaning = (expression: Expression, context: Table) => {
+  console.log("finding meaning of", expression, context)
   const val = handleAction(expressionToAction(expression))(expression, context);
-  console.log("value was", val);
+  console.log("meaning was", val);
   return val;
 }
 
@@ -127,6 +131,7 @@ function handleIdentifier(expression: Expression, context: Table): Expression {
 
 /**
  * We assume that expression takes the form of ['quote', ['things', 'to', 'quote']].
+ * This essentially stops the evaluation process.
  */
 function handleQuote(expression: Expression): Expression {
   if (isAtom(expression)) { throw new Error(`handleQuote cannot evaluate ${JSON.stringify(expression)}`)}
@@ -195,7 +200,7 @@ function handleApplication(expression: Expression, context: Table): Expression {
       const expression = args[0];
 
       // TODO: not sure why this is necessary -- why not just call isAtom?
-      // i also don't
+      // i also don't think this method is defined correctly
       // const isAppliedExpressionAtom = (expression: Expression) => {
       //   if (isAtom(expression)) { return true; }
       //   if (expression.length === 0) { return false; }
@@ -235,19 +240,21 @@ function handleApplication(expression: Expression, context: Table): Expression {
   }
   // here fn is either a lambda, or a primitive function name
   const [fn, ...args] = expression as ExpressionArray;
-  console.log("YO", expression, "SPLIT INTO", fn, "AND", args)
-
-  const evalList = (e: ExpressionArray, c: Table): ExpressionArray => {
-    console.log('evalList', e, isEmpty(e))
-    if (isEmpty(e)) { return ['quote', []] }
-    const [head, ...tail] = e;
-    // NOTE: this differs from the book -- if our head is the empty list,
-    // we must quote it (since the empty list is not a valid s expression).
-    return [isEmpty(head) ? value(['quote', []]) : value(head, c)].concat(evalList(tail, c))
-  }
 
   // here we convert the function into a Fun, and deal with args
-  return apply(value(fn, context) as Fun, evalList(args, context));
+  // return apply(value(fn, context) as Fun, evalList(args, context));
+
+  return apply(
+    // evaluate function
+    meaning(fn, context) as Fun,
+
+    /**
+     * Evaluate args. When evaluating args we must take care not to try
+     * calling `meaning` on the empty array. This is because the empty
+     * array is not a valid s expression.
+     */
+    args.map(arg => isEmpty(arg) ? arg : meaning(arg, context))
+  )
 }
 
 const dummy = () => 'dummy';
