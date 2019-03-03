@@ -8,6 +8,7 @@ interface ExpressionArray extends Array<Expression> {}
 const _head = <T>(xs: T[]): T => xs[0];
 const _tail = <T>(xs: T[]): T[] => xs.slice(1);
 const isEmpty = (expression: Expression) => !isAtom(expression) && expression.length === 0;
+
 /**
  * Given an expression, there are six possible actions we can take.
  *
@@ -17,6 +18,8 @@ const isEmpty = (expression: Expression) => !isAtom(expression) && expression.le
  * 4. *lambda
  * 5. *cond
  * 6. *application
+ *
+ * See the various handle functions (handleConst, handleApplication, etc.) for more details.
  */
 type Action = "*const" | "*identifier" | "*quote" | "*lambda" | "*cond" | "*application";
 
@@ -46,6 +49,8 @@ enum Primitive {
   subOne = 'subOne',
   isNumber = 'isNumber',
 }
+
+const PRIMITIVE_FUNCTIONS = new Set(Object.keys(Primitive));
 
 const lookup = (name: string, table: Table): Expression => {
   console.log('lookup', name);
@@ -96,7 +101,7 @@ const handleAction = (action: Action): (expression: Expression, context: Table) 
 }
 
 /**
- * We assume that expression takes the form of a number, a boolean, or one of our primitve functions.
+ * We assume that expression takes the form of a number, a boolean, or one of our primitive functions.
  *
  * For example,
  *
@@ -109,12 +114,20 @@ const handleAction = (action: Action): (expression: Expression, context: Table) 
  * or
  *
  * 'addOne'
+ *
+ * If our expression is a number or a boolean, stop processing. Otherwise, we assume that have a primitive function.
+ *
+ * Note that this means we can't handle strings directly! This is because we would then have no way
+ * to differentiate between the string `addOne` and the function `addOne`. Instead, all strings must
+ * be passed through `quote`.
  */
 function handleConst(expression: Expression): Expression {
   if (!isAtom(expression)) { throw new Error(`handleConst cannot evaluate ${JSON.stringify(expression)}`) }
   if (isNumber(expression) || isBoolean(expression)) {
     return expression;
   }
+
+  if (!PRIMITIVE_FUNCTIONS.has(expression)) { throw new Error(`handleConst found unknown primitive ${expression}`)}
 
   // we assume expression is one of the primitive functions as defined in atomToAction
   const fun: Fun = ['primitive', expression as Primitive];
@@ -159,6 +172,9 @@ function handleQuote(expression: Expression): Expression {
 function handleApplication(expression: Expression, context: Table): Expression {
   console.log('handleApplication', expression, context);
 
+  /**
+   * helper method that distinguishes between primitive and non primitive functions
+   */
   const apply = (fun: Fun, args: ExpressionArray) => {
     console.log("apply", fun, args)
     if (isPrimitiveFun(fun)) {
@@ -169,6 +185,9 @@ function handleApplication(expression: Expression, context: Table): Expression {
     throw new Error("Can't handle non primitive functions yet");
   }
 
+  /**
+   * handle our base default functions
+   */
   const applyPrimitive = (name: Primitive, args: ExpressionArray): Expression => {
     console.log("applyPrimitive", name, args)
     if (name === 'cons') {
@@ -241,22 +260,46 @@ function handleApplication(expression: Expression, context: Table): Expression {
   // here fn is either a lambda, or a primitive function name
   const [fn, ...args] = expression as ExpressionArray;
 
-  // here we convert the function into a Fun, and deal with args
-  // return apply(value(fn, context) as Fun, evalList(args, context));
-
   return apply(
-    // evaluate function
+    /**
+     * Evaluate our function. Why must we evaluate our function?
+     *
+     * We call `meaning` on our function to determine whether or not this a
+     * primitive function or a non primitive lambda function.
+     *
+     * If this function is a primitive, it will
+     * eventually call handleConst which will return a ['primitive', fn] tuple.
+     *
+     * If this function is a non primitive, it will eventually
+     * call handleLambda which will return a ['nonPrimitive', Expression] tuple.
+     */
     meaning(fn, context) as Fun,
 
     /**
-     * Evaluate args. When evaluating args we must take care not to try
-     * calling `meaning` on the empty array. This is because the empty
-     * array is not a valid s expression.
+     * Evaluate our args.
+     *
+     * Why must we evaluate args? This is because arguments themselves
+     * may be function applications that need evaluating. For example,
+     * consider the following s expression:
+     *
+     * (cons 1 (cons 2 (cons 3 (cons ()))))
+     *
+     * Our arguments are 1 and (cons 2 (cons 3 (cons ()))). In order to
+     * evaluate our root s expression, we must evaluate its children to
+     * know that we're consing 1 onto (2 3).
+     *
+     * It is important to note that when evaluating args we must take care
+     * to never evaluate the empty array. This is because the empty
+     * array is not a valid s expression -- calling meaning([]) will cause
+     * the app to crash.
      */
     args.map(arg => isEmpty(arg) ? arg : meaning(arg, context))
   )
 }
 
+/**
+ * placeholder action handler
+ */
 const dummy = () => 'dummy';
 
 const expressionToAction = (expression: Expression): Action => {
@@ -269,8 +312,7 @@ const atomToAction = (atom: Atom): Action => {
   if (isNumber(atom)) { return '*const' }
   if (isBoolean(atom)) { return '*const' }
 
-  const primitiveFunctions = new Set(Object.keys(Primitive));
-  if (primitiveFunctions.has(atom)) { return '*const' }
+  if (PRIMITIVE_FUNCTIONS.has(atom)) { return '*const' }
 
   return '*identifier';
 }

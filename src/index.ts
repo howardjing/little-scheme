@@ -4,7 +4,6 @@ const expressions = [
   1,
   ["quote", 1],
   ["quote", [1,2]],
-  ['addOne', 10],
   ['cons', 1, ['quote', [2, 3]]],
   ['head', ['quote', ['a', 'b', 'c']]],
   ['tail', ['quote', ['a', 'b', 'c']]],
