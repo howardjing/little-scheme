@@ -32,6 +32,9 @@ const expressions = [
   ['cond', [['isEqual', 1, 1], 3], ['else', 4]],
   ['cond', [['isEqual', 1, 2], 3], [['isEqual', 1, 1], 5], ['else', 4]],
   [['lambda', ['x'], ['addOne', 'x']], 20],
+  [[['lambda', ['x'],
+      ['lambda', ['y'],
+        ['cons', 'x', ['cons', 'y', []]]]], 2], 1],
 ]
 
 expressions.forEach(expression => {
