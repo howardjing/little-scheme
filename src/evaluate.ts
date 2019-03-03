@@ -94,7 +94,7 @@ const handleAction = (action: Action): (expression: Expression, context: Table) 
     case '*identifier': return handleIdentifier;
     case '*quote': return handleQuote;
     case '*lambda': return dummy;
-    case '*cond': return dummy;
+    case '*cond': return handleCond;
     case '*application': return handleApplication;
     default: throw new Error(`Invalid action: ${action}`)
   }
@@ -151,6 +151,36 @@ function handleQuote(expression: Expression): Expression {
   console.log('handleQuote', expression);
   const [_, quoted] = expression;
   return quoted;
+}
+
+/**
+ * We assume that expression takes the form of
+ *
+ * ['cond', [['isEqual', 1, 2], 1], [['isEqual', 1, 3], 2], ['else', 3]]
+ *
+ * For each line in the conditional, we evaluate the first part of the line. If it evaluates to
+ * true, we evaluate the second part of the line.
+ *
+ * If we encounter an 'else' in the first part of the line, then we treat that line as true, and
+ * evaluate the second part of the line.
+ */
+function handleCond(expression: Expression, context: Table): Expression {
+  if (isAtom(expression)) { throw new Error(`handleCond cannot evaluate ${JSON.stringify(expression)}`)}
+  console.log('handleQuote', expression, context);
+
+  // ignore the first element in expression -- the first element is 'cond'
+  const truthfulExp: ExpressionArray | undefined = expression.slice(1)
+    // @ts-ignore - for some reason it thinks this lambda function is not the correct type
+    .find((subexp) => {
+      if (isAtom(subexp)) { throw new Error(`Invalid subexp ${JSON.stringify(subexp)}`) }
+
+      const [predicate] = subexp as ExpressionArray;
+      return predicate === 'else' || meaning(predicate, context);
+    });
+
+  if (truthfulExp === undefined) { throw new Error(`No truthy condition in ${JSON.stringify(expression)}`)}
+  const [_, body] = truthfulExp;
+  return meaning(body, context);
 }
 
 /**
@@ -264,14 +294,14 @@ function handleApplication(expression: Expression, context: Table): Expression {
     /**
      * Evaluate our function. Why must we evaluate our function?
      *
-     * We call `meaning` on our function to determine whether or not this a
-     * primitive function or a non primitive lambda function.
+     * We evaluate our function to determine whether it is a
+     * primitive function or a non primitive function.
      *
-     * If this function is a primitive, it will
+     * If it is a primitive, it will
      * eventually call handleConst which will return a ['primitive', fn] tuple.
      *
-     * If this function is a non primitive, it will eventually
-     * call handleLambda which will return a ['nonPrimitive', Expression] tuple.
+     * If it is a non primitive, it will eventually
+     * call handleLambda which will return a ['nonPrimitive', [table, formals, body]] tuple.
      */
     meaning(fn, context) as Fun,
 

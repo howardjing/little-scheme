@@ -25,7 +25,11 @@ const expressions = [
   ['isNumber', ['quote', '12']],
   ['quote', []],
   ['cons', 1, []],
-  ['cons', 1, ['cons', 2, ['cons', 3, []]]]
+  ['cons', 1, ['cons', 2, ['cons', 3, []]]],
+  ['cond', [['isEqual', 1, 2], 3], ['else', 4]],
+  ['cond', [['isEqual', 1, 1], 3], ['else', 4]],
+  ['cond', [['isEqual', 1, 2], 3], [['isEqual', 1, 1], 5], ['else', 4]],
+
 ]
 
 expressions.forEach(expression => {
